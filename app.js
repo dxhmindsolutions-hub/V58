@@ -1,39 +1,58 @@
-/* ========= ESTADO ========= */
+/* ===============================
+   DESPENSA – app.js COMPLETO
+   Categorías independientes
+   =============================== */
+
+/* ===== ESTADO ===== */
+
+// Categorías propias (NO dependen de productos)
+let categories = JSON.parse(localStorage.getItem("categories")) || [
+  "Granos",
+  "Lácteos",
+  "Bebidas",
+  "Limpieza"
+];
+
+// Productos
 let items = JSON.parse(localStorage.getItem("items")) || [
   { id: 1, name: "Arroz", cat: "Granos" },
   { id: 2, name: "Pasta", cat: "Granos" },
-  { id: 3, name: "Leche", cat: "Lácteos" },
-  { id: 4, name: "Yogur", cat: "Lácteos" }
+  { id: 3, name: "Leche", cat: "Lácteos" }
 ];
 
+// Ticket
 let ticket = JSON.parse(localStorage.getItem("ticket")) || [];
+
+// Categoría seleccionada
 let selectedCat = "Todos";
 
-/* ========= HELPERS ========= */
+/* ===== HELPERS ===== */
 const $ = id => document.getElementById(id);
-const save = () => {
+
+function save() {
+  localStorage.setItem("categories", JSON.stringify(categories));
   localStorage.setItem("items", JSON.stringify(items));
   localStorage.setItem("ticket", JSON.stringify(ticket));
-};
+}
 
-/* ========= DRAWER ========= */
+/* ===== DRAWER ===== */
 function toggleDrawer() {
   $("drawer").classList.toggle("open");
 }
 
-/* ========= CATEGORÍAS ========= */
+/* ===== CATEGORÍAS ===== */
 function renderCategories() {
   const drawer = $("drawer");
   if (!drawer) return;
 
-  const cats = ["Todos", ...new Set(items.map(i => i.cat))];
+  const cats = ["Todos", ...categories];
 
   drawer.innerHTML = cats
-    .map(c => `
+    .map(cat => `
       <button
-        class="${c === selectedCat ? "active" : ""}"
-        onclick="selectCategory('${c}')">
-        ${c}
+        class="${cat === selectedCat ? "active" : ""}"
+        onclick="selectCategory('${cat}')">
+        ${cat}
       </button>
     `)
     .join("");
@@ -42,10 +61,10 @@ function renderCategories() {
 function selectCategory(cat) {
   selectedCat = cat;
   toggleDrawer();
-  render();
+  renderItems();
 }
 
-/* ========= LISTA ========= */
+/* ===== LISTA DE PRODUCTOS ===== */
 function renderItems() {
   const list = $("list");
   const search = $("search").value.toLowerCase();
@@ -67,9 +86,11 @@ function renderItems() {
     .join("");
 }
 
-/* ========= TICKET ========= */
+/* ===== TICKET ===== */
 function addToTicket(id) {
   const item = items.find(i => i.id === id);
+  if (!item) return;
+
   ticket.push(item);
   save();
   renderTicket();
@@ -86,8 +107,8 @@ function renderTicket() {
     .join("");
 }
 
-function removeFromTicket(i) {
-  ticket.splice(i, 1);
+function removeFromTicket(index) {
+  ticket.splice(index, 1);
   save();
   renderTicket();
 }
@@ -98,12 +119,19 @@ function resetTicket() {
   renderTicket();
 }
 
-/* ========= CRUD ========= */
+/* ===== PRODUCTOS ===== */
 function showAddItem() {
-  const name = prompt("Nombre del producto");
-  const cat = prompt("Categoría");
+  let name = prompt("Nombre del producto:");
+  if (!name) return;
+  name = name.trim();
 
-  if (!name || !cat) return;
+  let cat = prompt(
+    "Categoría (elige una):\n" + categories.join(", ")
+  );
+  if (!cat || !categories.includes(cat)) {
+    alert("Categoría no válida");
+    return;
+  }
 
   items.push({
     id: Date.now(),
@@ -116,17 +144,19 @@ function showAddItem() {
 }
 
 function deleteItem(id) {
+  if (!confirm("¿Eliminar este producto?")) return;
+
   items = items.filter(i => i.id !== id);
   save();
   render();
 }
 
-/* ========= RENDER ========= */
+/* ===== RENDER GENERAL ===== */
 function render() {
   renderCategories();
   renderItems();
   renderTicket();
 }
 
-/* ========= INIT ========= */
+/* ===== INIT ===== */
 document.addEventListener("DOMContentLoaded", render);
