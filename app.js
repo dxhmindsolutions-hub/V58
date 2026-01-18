@@ -1,9 +1,10 @@
 /* ===============================
-   ESTADO GLOBAL
+   ESTADO
 ================================ */
 let items = [];
-let cart = [];
+let ticket = [];
 let selectedCat = "Todos";
+let deleteId = null;
 
 /* ===============================
    HELPERS
@@ -13,26 +14,21 @@ const $ = id => document.getElementById(id);
 /* ===============================
    STORAGE
 ================================ */
-function saveState() {
+function save() {
   localStorage.setItem("items", JSON.stringify(items));
-  localStorage.setItem("cart", JSON.stringify(cart));
+  localStorage.setItem("ticket", JSON.stringify(ticket));
 }
 
-function loadState() {
+function load() {
   items = JSON.parse(localStorage.getItem("items")) || [];
-  cart = JSON.parse(localStorage.getItem("cart")) || [];
+  ticket = JSON.parse(localStorage.getItem("ticket")) || [];
 }
 
 /* ===============================
-   UI FEEDBACK
+   DRAWER
 ================================ */
-function toast(msg) {
-  const t = document.createElement("div");
-  t.textContent = msg;
-  t.style =
-    "position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 14px;border-radius:10px;z-index:9999";
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 1500);
+function toggleDrawer() {
+  $("drawer").classList.toggle("open");
 }
 
 /* ===============================
@@ -42,20 +38,19 @@ function render() {
   renderCategories();
   renderItems();
   renderTicket();
-  saveState();
+  save();
 }
 
 /* ===============================
-   CATEGORÍAS (DRAWER)
+   CATEGORÍAS
 ================================ */
 function renderCategories() {
   const cats = ["Todos", ...new Set(items.map(i => i.cat))];
 
-  $("catList").innerHTML = cats
+  $("drawer").innerHTML = cats
     .map(
       c => `
-      <button
-        class="catBtn ${c === selectedCat ? "active" : ""}"
+      <button class="${c === selectedCat ? "active" : ""}"
         onclick="selectCategory('${c}')">
         ${c}
       </button>`
@@ -65,32 +60,43 @@ function renderCategories() {
 
 function selectCategory(cat) {
   selectedCat = cat;
+  toggleDrawer();
   renderItems();
 }
 
 /* ===============================
-   LISTA DE PRODUCTOS
+   LISTA
 ================================ */
 function renderItems() {
+  const q = $("search").value.toLowerCase();
+
   $("list").innerHTML = items
-    .filter(i => selectedCat === "Todos" || i.cat === selectedCat)
+    .filter(i =>
+      (selectedCat === "Todos" || i.cat === selectedCat) &&
+      i.name.toLowerCase().includes(q)
+    )
     .map(
       i => `
       <div class="item">
-        <span onclick="addToCart(${i.id})">${i.name}</span>
-        <button onclick="askDeleteItem(${i.id})">✕</button>
+        <span>${i.name}</span>
+        <div>
+          <button class="add" onclick="addToTicket(${i.id})">＋</button>
+          <button class="del" onclick="askDelete(${i.id})">✕</button>
+        </div>
       </div>`
     )
     .join("");
 }
 
 /* ===============================
-   CRUD PRODUCTOS
+   PRODUCTOS
 ================================ */
-function addItem() {
-  const name = $("iname").value.trim();
-  const cat = $("icat").value.trim();
-  if (!name || !cat) return;
+function showAddItem() {
+  const name = prompt("Nombre del producto:");
+  if (!name) return;
+
+  const cat = prompt("Categoría:");
+  if (!cat) return;
 
   items.push({
     id: Date.now(),
@@ -98,82 +104,73 @@ function addItem() {
     cat
   });
 
-  $("iname").value = "";
-  $("icat").value = "";
-
-  toast("Producto añadido");
   render();
 }
 
-function askDeleteItem(id) {
-  if (!confirm("¿Eliminar este producto?")) return;
+function askDelete(id) {
+  deleteId = id;
+  $("confirmText").textContent = "¿Eliminar este producto?";
+  $("confirmModal").style.display = "flex";
+}
 
-  items = items.filter(i => i.id !== id);
-  cart = cart.filter(c => c.id !== id);
+function closeConfirm() {
+  $("confirmModal").style.display = "none";
+  deleteId = null;
+}
 
-  toast("Producto eliminado");
+function confirmDelete() {
+  items = items.filter(i => i.id !== deleteId);
+  ticket = ticket.filter(t => t.id !== deleteId);
+  closeConfirm();
   render();
 }
 
 /* ===============================
-   CARRITO / TICKET
+   TICKET
 ================================ */
-function addToCart(id) {
+function addToTicket(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
 
-  const found = cart.find(c => c.id === id);
+  const found = ticket.find(t => t.id === id);
   if (found) found.qty++;
-  else cart.push({ id, name: item.name, qty: 1 });
+  else ticket.push({ id, name: item.name, qty: 1 });
 
-  toast("Añadido al ticket");
   renderTicket();
-  saveState();
+  save();
 }
 
-function removeFromCart(id) {
-  cart = cart.filter(c => c.id !== id);
-  renderTicket();
-  saveState();
-}
-
-function clearCart() {
-  if (!confirm("¿Vaciar ticket?")) return;
-  cart = [];
-  renderTicket();
-  saveState();
-}
-
-/* ===============================
-   TICKET UI
-================================ */
 function renderTicket() {
-  $("ticketList").innerHTML = cart
+  $("ticketList").innerHTML = ticket
     .map(
-      c => `
-      <div class="ticket-item">
-        ${c.name} x${c.qty}
-        <button onclick="removeFromCart(${c.id})">✕</button>
-      </div>`
+      t => `
+      <li>
+        ${t.name} x${t.qty}
+        <button onclick="removeFromTicket(${t.id})">✕</button>
+      </li>`
     )
     .join("");
 }
 
-/* ===============================
-   WHATSAPP / IMPRESIÓN
-================================ */
-function previewWhatsApp() {
-  const msg = cart
-    .map(c => `• ${c.name} x${c.qty}`)
-    .join("\n");
-
-  $("waText").value = msg;
-  $("waModal").style.display = "flex";
+function removeFromTicket(id) {
+  ticket = ticket.filter(t => t.id !== id);
+  renderTicket();
+  save();
 }
 
+function resetTicket() {
+  ticket = [];
+  renderTicket();
+  save();
+}
+
+/* ===============================
+   ACCIONES
+================================ */
 function sendWhatsApp() {
-  const txt = encodeURIComponent($("waText").value);
-  window.open(`https://wa.me/?text=${txt}`);
+  if (!ticket.length) return;
+  const msg = ticket.map(t => `• ${t.name} x${t.qty}`).join("\n");
+  window.open("https://wa.me/?text=" + encodeURIComponent(msg));
 }
 
 function printTicket() {
@@ -184,9 +181,9 @@ function printTicket() {
    INIT
 ================================ */
 function init() {
-  loadState();
+  load();
 
-  if (items.length === 0) {
+  if (!items.length) {
     items = [
       { id: 1, name: "Arroz", cat: "Granos" },
       { id: 2, name: "Azúcar", cat: "Granos" },
