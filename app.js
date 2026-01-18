@@ -1,102 +1,109 @@
-/* ===============================
-   ESTADO
-================================ */
-let items = [];
-let ticket = [];
+/* ========= ESTADO ========= */
+let items = JSON.parse(localStorage.getItem("items")) || [
+  { id: 1, name: "Arroz", cat: "Granos" },
+  { id: 2, name: "Pasta", cat: "Granos" },
+  { id: 3, name: "Leche", cat: "Lácteos" },
+  { id: 4, name: "Yogur", cat: "Lácteos" }
+];
+
+let ticket = JSON.parse(localStorage.getItem("ticket")) || [];
 let selectedCat = "Todos";
-let deleteId = null;
 
-/* ===============================
-   HELPERS
-================================ */
+/* ========= HELPERS ========= */
 const $ = id => document.getElementById(id);
-
-/* ===============================
-   STORAGE
-================================ */
-function save() {
+const save = () => {
   localStorage.setItem("items", JSON.stringify(items));
   localStorage.setItem("ticket", JSON.stringify(ticket));
-}
+};
 
-function load() {
-  items = JSON.parse(localStorage.getItem("items")) || [];
-  ticket = JSON.parse(localStorage.getItem("ticket")) || [];
-}
-
-/* ===============================
-   DRAWER
-================================ */
+/* ========= DRAWER ========= */
 function toggleDrawer() {
   $("drawer").classList.toggle("open");
 }
 
-/* ===============================
-   RENDER
-================================ */
-function render() {
-  renderCategories();
-  renderItems();
-  renderTicket();
-  save();
-}
-
-/* ===============================
-   CATEGORÍAS
-================================ */
+/* ========= CATEGORÍAS ========= */
 function renderCategories() {
+  const drawer = $("drawer");
+  if (!drawer) return;
+
   const cats = ["Todos", ...new Set(items.map(i => i.cat))];
 
-  $("drawer").innerHTML = cats
-    .map(
-      c => `
-      <button class="${c === selectedCat ? "active" : ""}"
+  drawer.innerHTML = cats
+    .map(c => `
+      <button
+        class="${c === selectedCat ? "active" : ""}"
         onclick="selectCategory('${c}')">
         ${c}
-      </button>`
-    )
+      </button>
+    `)
     .join("");
 }
 
 function selectCategory(cat) {
   selectedCat = cat;
   toggleDrawer();
-  renderItems();
+  render();
 }
 
-/* ===============================
-   LISTA
-================================ */
+/* ========= LISTA ========= */
 function renderItems() {
-  const q = $("search").value.toLowerCase();
+  const list = $("list");
+  const search = $("search").value.toLowerCase();
 
-  $("list").innerHTML = items
+  list.innerHTML = items
     .filter(i =>
       (selectedCat === "Todos" || i.cat === selectedCat) &&
-      i.name.toLowerCase().includes(q)
+      i.name.toLowerCase().includes(search)
     )
-    .map(
-      i => `
+    .map(i => `
       <div class="item">
         <span>${i.name}</span>
         <div>
-          <button class="add" onclick="addToTicket(${i.id})">＋</button>
-          <button class="del" onclick="askDelete(${i.id})">✕</button>
+          <button class="add" onclick="addToTicket(${i.id})">+</button>
+          <button class="del" onclick="deleteItem(${i.id})">×</button>
         </div>
-      </div>`
-    )
+      </div>
+    `)
     .join("");
 }
 
-/* ===============================
-   PRODUCTOS
-================================ */
-function showAddItem() {
-  const name = prompt("Nombre del producto:");
-  if (!name) return;
+/* ========= TICKET ========= */
+function addToTicket(id) {
+  const item = items.find(i => i.id === id);
+  ticket.push(item);
+  save();
+  renderTicket();
+}
 
-  const cat = prompt("Categoría:");
-  if (!cat) return;
+function renderTicket() {
+  $("ticketList").innerHTML = ticket
+    .map((i, idx) => `
+      <li>
+        ${i.name}
+        <button onclick="removeFromTicket(${idx})">×</button>
+      </li>
+    `)
+    .join("");
+}
+
+function removeFromTicket(i) {
+  ticket.splice(i, 1);
+  save();
+  renderTicket();
+}
+
+function resetTicket() {
+  ticket = [];
+  save();
+  renderTicket();
+}
+
+/* ========= CRUD ========= */
+function showAddItem() {
+  const name = prompt("Nombre del producto");
+  const cat = prompt("Categoría");
+
+  if (!name || !cat) return;
 
   items.push({
     id: Date.now(),
@@ -104,94 +111,22 @@ function showAddItem() {
     cat
   });
 
+  save();
   render();
 }
 
-function askDelete(id) {
-  deleteId = id;
-  $("confirmText").textContent = "¿Eliminar este producto?";
-  $("confirmModal").style.display = "flex";
-}
-
-function closeConfirm() {
-  $("confirmModal").style.display = "none";
-  deleteId = null;
-}
-
-function confirmDelete() {
-  items = items.filter(i => i.id !== deleteId);
-  ticket = ticket.filter(t => t.id !== deleteId);
-  closeConfirm();
+function deleteItem(id) {
+  items = items.filter(i => i.id !== id);
+  save();
   render();
 }
 
-/* ===============================
-   TICKET
-================================ */
-function addToTicket(id) {
-  const item = items.find(i => i.id === id);
-  if (!item) return;
-
-  const found = ticket.find(t => t.id === id);
-  if (found) found.qty++;
-  else ticket.push({ id, name: item.name, qty: 1 });
-
+/* ========= RENDER ========= */
+function render() {
+  renderCategories();
+  renderItems();
   renderTicket();
-  save();
 }
 
-function renderTicket() {
-  $("ticketList").innerHTML = ticket
-    .map(
-      t => `
-      <li>
-        ${t.name} x${t.qty}
-        <button onclick="removeFromTicket(${t.id})">✕</button>
-      </li>`
-    )
-    .join("");
-}
-
-function removeFromTicket(id) {
-  ticket = ticket.filter(t => t.id !== id);
-  renderTicket();
-  save();
-}
-
-function resetTicket() {
-  ticket = [];
-  renderTicket();
-  save();
-}
-
-/* ===============================
-   ACCIONES
-================================ */
-function sendWhatsApp() {
-  if (!ticket.length) return;
-  const msg = ticket.map(t => `• ${t.name} x${t.qty}`).join("\n");
-  window.open("https://wa.me/?text=" + encodeURIComponent(msg));
-}
-
-function printTicket() {
-  window.print();
-}
-
-/* ===============================
-   INIT
-================================ */
-function init() {
-  load();
-
-  if (!items.length) {
-    items = [
-      { id: 1, name: "Arroz", cat: "Granos" },
-      { id: 2, name: "Azúcar", cat: "Granos" },
-      { id: 3, name: "Leche", cat: "Lácteos" }
-    ];
-  }
-
-  render();
-}
-
-init();
+/* ========= INIT ========= */
+document.addEventListener("DOMContentLoaded", render);
